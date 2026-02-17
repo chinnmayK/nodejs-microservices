@@ -178,3 +178,30 @@ resource "aws_iam_role_policy" "codepipeline_codestar_permission" {
     ]
   })
 }
+
+resource "aws_iam_role_policy" "codepipeline_s3_policy" {
+  name = "${var.project_name}-codepipeline-s3"
+  role = aws_iam_role.codepipeline_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:GetObjectVersion",
+          "s3:PutObject"
+        ]
+        Resource = "arn:aws:s3:::${var.project_name}-artifacts/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetBucketVersioning"
+        ]
+        Resource = "arn:aws:s3:::${var.project_name}-artifacts"
+      }
+    ]
+  })
+}
