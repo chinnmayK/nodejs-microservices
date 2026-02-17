@@ -160,3 +160,21 @@ resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   role       = aws_iam_role.codedeploy_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
 }
+
+resource "aws_iam_role_policy" "codepipeline_codestar_permission" {
+  name = "${var.project_name}-codestar-permission"
+  role = aws_iam_role.codepipeline_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "codestar-connections:UseConnection"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
