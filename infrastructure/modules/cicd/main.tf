@@ -1,6 +1,9 @@
-resource "aws_s3_bucket" "artifact_bucket" {
-  bucket = "${var.project_name}-artifacts"
+############################################################
+# S3 ARTIFACT BUCKET
+############################################################
 
+resource "aws_s3_bucket" "artifact_bucket" {
+  bucket        = "${var.project_name}-artifacts"
   force_destroy = true
 }
 
@@ -12,20 +15,24 @@ resource "aws_s3_bucket_versioning" "artifact_versioning" {
   }
 }
 
+############################################################
+# CODEBUILD PROJECT
+############################################################
+
 resource "aws_codebuild_project" "microservices_build" {
-  name          = "${var.project_name}-build"
-  description   = "Build all microservices docker images"
-  service_role  = var.codebuild_role_arn
+  name         = "${var.project_name}-build"
+  description  = "Build all microservices docker images"
+  service_role = var.codebuild_role_arn
 
   artifacts {
     type = "CODEPIPELINE"
   }
 
   environment {
-    compute_type                = "BUILD_GENERAL1_SMALL"
-    image                       = "aws/codebuild/standard:7.0"
-    type                        = "LINUX_CONTAINER"
-    privileged_mode             = true   # required for Docker build
+    compute_type    = "BUILD_GENERAL1_SMALL"
+    image           = "aws/codebuild/standard:7.0"
+    type            = "LINUX_CONTAINER"
+    privileged_mode = true
 
     environment_variable {
       name  = "AWS_DEFAULT_REGION"
@@ -39,21 +46,50 @@ resource "aws_codebuild_project" "microservices_build" {
   }
 
   source {
-    type = "CODEPIPELINE"
+    type      = "CODEPIPELINE"
     buildspec = "buildspec.yml"
   }
 
   build_timeout = 20
 }
 
-################################
-# CODESTAR GITHUB CONNECTION
-################################
+############################################################
+# CODEDEPLOY APPLICATION
+############################################################
+
+resource "aws_codedeploy_app" "app" {
+  name             = "${var.project_name}-app"
+  compute_platform = "Server"
+}
+
+resource "aws_codedeploy_deployment_group" "deployment_group" {
+  app_name              = aws_codedeploy_app.app.name
+  deployment_group_name = "${var.project_name}-dg"
+  service_role_arn      = var.codedeploy_role_arn
+
+  deployment_config_name = "CodeDeployDefault.AllAtOnce"
+
+  ec2_tag_set {
+    ec2_tag_filter {
+      key   = "Name"
+      type  = "KEY_AND_VALUE"
+      value = "${var.project_name}-ec2"
+    }
+  }
+}
+
+############################################################
+# CODESTAR CONNECTION
+############################################################
 
 resource "aws_codestarconnections_connection" "github" {
   name          = "${var.project_name}-gc"
   provider_type = "GitHub"
 }
+
+############################################################
+# CODEPIPELINE
+############################################################
 
 resource "aws_codepipeline" "microservices_pipeline" {
   name     = "${var.project_name}-pipeline"
@@ -65,7 +101,7 @@ resource "aws_codepipeline" "microservices_pipeline" {
   }
 
   ################################
-  # SOURCE STAGE (GitHub)
+  # SOURCE STAGE
   ################################
   stage {
     name = "Source"
@@ -104,6 +140,27 @@ resource "aws_codepipeline" "microservices_pipeline" {
 
       configuration = {
         ProjectName = aws_codebuild_project.microservices_build.name
+      }
+    }
+  }
+
+  ################################
+  # DEPLOY STAGE
+  ################################
+  stage {
+    name = "Deploy"
+
+    action {
+      name            = "DeployToEC2"
+      category        = "Deploy"
+      owner           = "AWS"
+      provider        = "CodeDeploy"
+      version         = "1"
+      input_artifacts = ["source_output"]
+
+      configuration = {
+        ApplicationName     = aws_codedeploy_app.app.name
+        DeploymentGroupName = aws_codedeploy_deployment_group.deployment_group.deployment_group_name
       }
     }
   }

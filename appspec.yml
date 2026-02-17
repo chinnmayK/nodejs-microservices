@@ -1,0 +1,12 @@
+version: 0.0
+os: linux
+
+files:
+  - source: /
+    destination: /opt/node-app
+
+hooks:
+  AfterInstall:
+    - location: deploy.sh
+      timeout: 300
+      runas: ubuntu
