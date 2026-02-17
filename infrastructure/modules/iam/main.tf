@@ -17,29 +17,67 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_policy_attach" {
+############################
+# EC2 MANAGED POLICIES
+############################
+
+# Pull Docker images from ECR
+resource "aws_iam_role_policy_attachment" "ec2_ecr" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+# Read secrets (narrow later)
 resource "aws_iam_role_policy_attachment" "ec2_secrets" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/SecretsManagerReadWrite"
 }
 
+# CloudWatch Agent
 resource "aws_iam_role_policy_attachment" "ec2_cloudwatch" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
 }
+
+############################
+# MINIMAL ELASTICACHE POLICY
+############################
+
+resource "aws_iam_policy" "ec2_elasticache_minimal" {
+  name        = "${var.project_name}-elasticache-minimal"
+  description = "Minimal permissions for EC2 to describe ElastiCache"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "elasticache:DescribeCacheClusters",
+        "elasticache:DescribeReplicationGroups",
+        "elasticache:ListTagsForResource"
+      ]
+      Resource = "*"
+    }]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "ec2_elasticache_attach" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = aws_iam_policy.ec2_elasticache_minimal.arn
+}
+
+############################
+# INSTANCE PROFILE
+############################
 
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.project_name}-instance-profile"
   role = aws_iam_role.ec2_role.name
 }
 
-############################
+########################################################
 # CODEBUILD ROLE
-############################
+########################################################
 
 resource "aws_iam_role" "codebuild_role" {
   name = "${var.project_name}-codebuild-role"
@@ -56,14 +94,27 @@ resource "aws_iam_role" "codebuild_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "codebuild_admin" {
+# Required for building + pushing Docker images
+resource "aws_iam_role_policy_attachment" "codebuild_ecr" {
   role       = aws_iam_role.codebuild_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryPowerUser"
 }
 
-############################
+# Logging
+resource "aws_iam_role_policy_attachment" "codebuild_logs" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = "arn:aws:iam::aws:policy/CloudWatchLogsFullAccess"
+}
+
+# Read artifacts from S3
+resource "aws_iam_role_policy_attachment" "codebuild_s3" {
+  role       = aws_iam_role.codebuild_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonS3FullAccess"
+}
+
+########################################################
 # CODEPIPELINE ROLE
-############################
+########################################################
 
 resource "aws_iam_role" "codepipeline_role" {
   name = "${var.project_name}-codepipeline-role"
@@ -80,14 +131,14 @@ resource "aws_iam_role" "codepipeline_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "codepipeline_admin" {
+resource "aws_iam_role_policy_attachment" "codepipeline_policy" {
   role       = aws_iam_role.codepipeline_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+  policy_arn = "arn:aws:iam::aws:policy/AWSCodePipeline_FullAccess"
 }
 
-############################
+########################################################
 # CODEDEPLOY ROLE
-############################
+########################################################
 
 resource "aws_iam_role" "codedeploy_role" {
   name = "${var.project_name}-codedeploy-role"
@@ -104,7 +155,8 @@ resource "aws_iam_role" "codedeploy_role" {
   })
 }
 
-resource "aws_iam_role_policy_attachment" "codedeploy_admin" {
+# Official CodeDeploy service role
+resource "aws_iam_role_policy_attachment" "codedeploy_policy" {
   role       = aws_iam_role.codedeploy_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AdministratorAccess"
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole"
 }

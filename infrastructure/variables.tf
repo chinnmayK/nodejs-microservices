@@ -1,12 +1,14 @@
-variable "aws_region" {
-  default = "us-east-1"
+variable "project_name" {
+  type        = string
+  description = "Project name prefix"
 }
 
-variable "project_name" {
-  default = "node-microservices"
+variable "aws_region" {
+  type        = string
+  description = "AWS region"
 }
 
 variable "github_repo" {
+  type        = string
   description = "GitHub repo in format username/repo"
 }
-

@@ -1,3 +1,3 @@
-github_repo = "YOUR_GITHUB_USERNAME/YOUR_REPO_NAME"
-github_token = "YOUR_GITHUB_TOKEN"
+project_name = "node-microservices"
 aws_region = "ap-south-1"
+github_repo  = "chinnmayK/nodejs-microservices"

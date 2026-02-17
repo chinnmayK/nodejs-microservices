@@ -1,84 +1,80 @@
 const { ShoppingRepository } = require("../database");
 const { FormateData } = require("../utils");
 
-// All Business logic will be here
 class ShoppingService {
+  constructor() {
+    this.repository = new ShoppingRepository();
+  }
 
-    constructor(){
-        this.repository = new ShoppingRepository();
+  // ================= CART =================
+  async GetCart({ _id }) {
+    const cartItems = await this.repository.Cart(_id);
+    return FormateData(cartItems);
+  }
+
+  async ManageCart(customerId, product, qty, isRemove) {
+    const result = await this.repository.AddCartItem(
+      customerId,
+      product,
+      qty,
+      isRemove
+    );
+
+    return FormateData(result);
+  }
+
+  // ================= ORDER =================
+  async PlaceOrder({ _id, txnNumber }) {
+    const order = await this.repository.CreateNewOrder(_id, txnNumber);
+    return FormateData(order);
+  }
+
+  async GetOrders(customerId) {
+    const orders = await this.repository.Orders(customerId);
+    return FormateData(orders);
+  }
+
+  async GetOrderDetails(customerId, orderId) {
+    const order = await this.repository.OrderDetails(customerId, orderId);
+
+    if (!order) throw new Error("Order not found");
+
+    return FormateData(order);
+  }
+
+  // ================= EVENT HANDLER =================
+  async SubscribeEvents(payload) {
+    console.log("Shopping Service Processing Events");
+
+    const { event, data } = JSON.parse(payload);
+    const { userId, product, qty } = data;
+
+    switch (event) {
+      case "ADD_TO_CART":
+        await this.ManageCart(userId, product, qty, false);
+        break;
+
+      case "REMOVE_FROM_CART":
+        await this.ManageCart(userId, product, qty, true);
+        break;
+
+      default:
+        break;
     }
+  }
 
-    async GetCart({ _id }){
-        
-        const cartItems = await this.repository.Cart(_id);
-        return FormateData(cartItems);
-    }
+  // ================= CREATE ORDER EVENT PAYLOAD =================
+  async GetOrderPayload(userId, order, event) {
+    if (!order) throw new Error("No order available");
 
-
-    async PlaceOrder(userInput){
-
-        const { _id, txnNumber } = userInput
-
-        const orderResult = await this.repository.CreateNewOrder(_id, txnNumber);
-        
-        return FormateData(orderResult);
-    }
-
-    async GetOrders(customerId){
-        
-        const orders = await this.repository.Orders(customerId);
-        return FormateData(orders)
-    }
-
-    async GetOrderDetails({ _id,orderId }){
-        const orders = await this.repository.Orders(productId);
-        return FormateData(orders)
-    }
-
-    async ManageCart(customerId, item,qty, isRemove){
-
-        const cartResult = await this.repository.AddCartItem(customerId,item,qty, isRemove);
-        return FormateData(cartResult);
-    }
-     
-
-    async SubscribeEvents(payload){
- 
-        payload = JSON.parse(payload);
-        const { event, data } = payload;
-        const { userId, product, qty } = data;
-        
-        switch(event){
-            case 'ADD_TO_CART':
-                this.ManageCart(userId,product, qty, false);
-                break;
-            case 'REMOVE_FROM_CART':
-                this.ManageCart(userId,product, qty, true);
-                break;
-            default:
-                break;
-        }
- 
-    }
-
-
-    async GetOrderPayload(userId,order,event){
-
-       if(order){
-            const payload = { 
-               event: event,
-               data: { userId, order }
-           };
-
-            return payload
-       }else{
-           return FormateData({error: 'No Order Available'});
-       }
-
-   }
-
- 
-
+    return {
+      event,
+      data: {
+        userId,
+        order,
+      },
+    };
+  }
 }
 
 module.exports = ShoppingService;

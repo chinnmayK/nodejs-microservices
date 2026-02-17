@@ -1,5 +1,7 @@
-// database related modules
+const { databaseConnection } = require("./connection");
+const ProductRepository = require("./repository/product-repository");
+
 module.exports = {
-    databaseConnection: require('./connection'),
-    ProductRepository: require('./repository/product-repository'),
-}
+  databaseConnection,
+  ProductRepository,
+};

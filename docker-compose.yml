@@ -1,0 +1,141 @@
+services:
+
+  mongodb:
+    image: public.ecr.aws/docker/library/mongo:7
+    container_name: mongodb
+    restart: always
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: public.ecr.aws/docker/library/rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - app-network
+
+  gateway:
+    build: ./gateway
+    container_name: gateway
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      customer:
+        condition: service_started
+      products:
+        condition: service_started
+      shopping:
+        condition: service_started
+    environment:
+      PORT: 8000
+      CUSTOMER_SERVICE_URL: http://customer:8001
+      PRODUCT_SERVICE_URL: http://products:8002
+      SHOPPING_SERVICE_URL: http://shopping:8003
+    networks:
+      - app-network
+
+  customer:
+    build: ./customer
+    container_name: customer
+    restart: always
+    ports:
+      - "8001:8001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: 8001
+      APP_SECRET: ${APP_SECRET}
+      EXCHANGE_NAME: ONLINE_STORE
+      CUSTOMER_SERVICE: CUSTOMER_SERVICE
+      MONGO_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/customer?authSource=admin
+      MSG_QUEUE_URL: amqp://${RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+    networks:
+      - app-network
+
+  products:
+    build: ./products
+    container_name: products
+    restart: always
+    ports:
+      - "8002:8002"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      PORT: 8002
+      APP_SECRET: ${APP_SECRET}
+      EXCHANGE_NAME: ONLINE_STORE
+      SHOPPING_SERVICE: SHOPPING_SERVICE
+      MONGO_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/products?authSource=admin
+      MSG_QUEUE_URL: amqp://${RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+      REDIS_URL: redis://redis:6379
+    networks:
+      - app-network
+
+  shopping:
+    build: ./shopping
+    container_name: shopping
+    restart: always
+    ports:
+      - "8003:8003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: 8003
+      APP_SECRET: ${APP_SECRET}
+      EXCHANGE_NAME: ONLINE_STORE
+      SHOPPING_SERVICE: SHOPPING_SERVICE
+      MONGO_URI: mongodb://${MONGO_USERNAME}:${MONGO_PASSWORD}@mongodb:27017/shopping?authSource=admin
+      MSG_QUEUE_URL: amqp://${RABBITMQ_USERNAME}:${RABBITMQ_PASSWORD}@rabbitmq:5672
+    networks:
+      - app-network
+
+volumes:
+  mongo_data:
+
+networks:
+  app-network:
+    driver: bridge

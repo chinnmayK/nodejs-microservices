@@ -1,0 +1,40 @@
+version: 0.2
+
+env:
+  variables:
+    IMAGE_TAG: latest
+    PROJECT_NAME: node-microservices
+
+phases:
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo Build started on `date`
+
+      - docker build -t $PROJECT_NAME-customer ./customer
+      - docker build -t $PROJECT_NAME-products ./products
+      - docker build -t $PROJECT_NAME-shopping ./shopping
+      - docker build -t $PROJECT_NAME-gateway ./gateway
+
+      - docker tag $PROJECT_NAME-customer:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-products:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-shopping:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-gateway:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+
+  post_build:
+    commands:
+      - echo Pushing images...
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
+      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+
+artifacts:
+  files:
+    - '**/*'
