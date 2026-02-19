@@ -1,16 +1,32 @@
 #!/bin/bash
 set -euxo pipefail
 
-exec > /var/log/user-data.log 2>&1
+exec > >(tee /var/log/user-data.log | logger -t user-data -s 2>/dev/console) 2>&1
 
 echo "===== Starting EC2 Bootstrap ====="
+
+trap 'echo "ERROR on line $LINENO"; exit 1' ERR
 
 export DEBIAN_FRONTEND=noninteractive
 
 ########################################
-# Detect Region
+# Wait for apt to be ready
 ########################################
-REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+echo "Waiting for apt lock..."
+while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+  sleep 5
+done
+
+########################################
+# Detect Region (IMDSv2 compatible)
+########################################
+TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
+  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
+
+REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
+  http://169.254.169.254/latest/meta-data/placement/region)
+
+echo "Detected region: $REGION"
 
 ########################################
 # Update System
@@ -26,7 +42,8 @@ apt-get install -y \
   unzip \
   wget \
   git \
-  ruby-full
+  ruby-full \
+  software-properties-common
 
 ########################################
 # Install Docker
@@ -39,10 +56,12 @@ curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
 
 chmod a+r /etc/apt/keyrings/docker.gpg
 
+UBUNTU_CODENAME=$(lsb_release -cs)
+
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
   https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" \
+  ${UBUNTU_CODENAME} stable" \
   > /etc/apt/sources.list.d/docker.list
 
 apt-get update -y
@@ -62,7 +81,6 @@ usermod -aG docker ubuntu
 ########################################
 # Install AWS CLI v2
 ########################################
-
 cd /tmp
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -o awscliv2.zip
@@ -71,15 +89,13 @@ unzip -o awscliv2.zip
 ########################################
 # Install CloudWatch Agent
 ########################################
-
 cd /tmp
 wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
 dpkg -i amazon-cloudwatch-agent.deb
 
 ########################################
-# Create CloudWatch Config
+# Configure CloudWatch Agent
 ########################################
-
 cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
 {
   "agent": {
@@ -137,8 +153,8 @@ systemctl enable amazon-cloudwatch-agent
 ########################################
 # Install CodeDeploy Agent
 ########################################
-
 cd /home/ubuntu
+
 wget -q https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install
 chmod +x install
 ./install auto
@@ -149,7 +165,6 @@ systemctl start codedeploy-agent
 ########################################
 # Create Application Directory
 ########################################
-
 mkdir -p /opt/node-app
 chown -R ubuntu:ubuntu /opt/node-app
 

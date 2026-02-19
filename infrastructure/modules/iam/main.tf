@@ -135,7 +135,6 @@ resource "aws_iam_role" "codepipeline_role" {
 # CodePipeline Permissions
 ########################################################
 
-# S3 artifact access
 resource "aws_iam_role_policy" "codepipeline_s3_policy" {
   name = "${var.project_name}-codepipeline-s3"
   role = aws_iam_role.codepipeline_role.id
@@ -150,7 +149,10 @@ resource "aws_iam_role_policy" "codepipeline_s3_policy" {
           "s3:GetObjectVersion",
           "s3:PutObject"
         ]
-        Resource = "arn:aws:s3:::${var.project_name}-artifacts/*"
+        Resource = [
+          "arn:aws:s3:::${var.project_name}-artifacts",
+          "arn:aws:s3:::${var.project_name}-artifacts/*"
+        ]
       },
       {
         Effect = "Allow"
@@ -262,16 +264,13 @@ resource "aws_iam_policy" "ec2_s3_artifacts" {
         Effect = "Allow"
         Action = [
           "s3:GetObject",
-          "s3:GetObjectVersion"
-        ]
-        Resource = "arn:aws:s3:::${var.project_name}-artifacts/*"
-      },
-      {
-        Effect = "Allow"
-        Action = [
+          "s3:GetObjectVersion",
           "s3:GetBucketLocation"
         ]
-        Resource = "arn:aws:s3:::${var.project_name}-artifacts"
+        Resource = [
+          "arn:aws:s3:::${var.project_name}-artifacts",
+          "arn:aws:s3:::${var.project_name}-artifacts/*"
+        ]
       }
     ]
   })

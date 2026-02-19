@@ -49,4 +49,4 @@ artifacts:
   files:
     - appspec.yml
     - docker-compose.yml
-    
+    - deploy.sh
