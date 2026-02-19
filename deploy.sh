@@ -1,7 +1,9 @@
 #!/bin/bash
-
-# Exit immediately if a command exits with a non-zero status
 set -e
+
+# --- FIX FOR WINDOWS LINE ENDINGS ---
+# This line removes any hidden \r characters from this script while it runs
+sed -i 's/\r$//' "$0" 2>/dev/null || true
 
 APP_DIR="/opt/node-app"
 AWS_REGION="ap-south-1"
@@ -13,9 +15,13 @@ aws ecr get-login-password --region $AWS_REGION | \
 docker login --username AWS --password-stdin $ECR_URL
 
 echo "Stopping old containers..."
-cd $APP_DIR || exit
-# Using 'docker compose' (V2). If this fails, try 'docker-compose'
-docker compose down || docker-compose down || true
+cd $APP_DIR
+# Use only the command that exists on your system
+if docker compose version >/dev/null 2>&1; then
+    docker compose down || true
+else
+    docker-compose down || true
+fi
 
 echo "Pulling latest images..."
 docker pull $ECR_URL/node-microservices-customer:latest
@@ -24,10 +30,10 @@ docker pull $ECR_URL/node-microservices-shopping:latest
 docker pull $ECR_URL/node-microservices-gateway:latest
 
 echo "Starting containers..."
-# Ensure there is no space or hidden character before -d
-docker compose up -d || docker-compose up -d
+# We use 'up -d' with no trailing spaces to avoid parsing errors
+docker compose up -d
 
-echo "Cleaning up unused images..."
+echo "Cleaning up..."
 docker image prune -f
 
 echo "Deployment complete."

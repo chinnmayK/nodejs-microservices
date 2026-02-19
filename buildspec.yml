@@ -16,7 +16,7 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-
+      - sed -i 's/\r$//' deploy.sh
       - docker build -t $PROJECT_NAME-customer ./customer
       - docker build -t $PROJECT_NAME-products ./products
       - docker build -t $PROJECT_NAME-shopping ./shopping
