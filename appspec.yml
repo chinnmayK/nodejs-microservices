@@ -1,6 +1,7 @@
 version: 0.0
 os: linux
 
+# Only copy artifact files (like appspec.yml and any scripts) to EC2
 files:
   - source: /
     destination: /opt/node-app

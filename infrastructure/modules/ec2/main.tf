@@ -9,7 +9,21 @@ resource "aws_instance" "app" {
 
   user_data = file("${path.module}/user_data.sh")
 
+  metadata_options {
+    http_endpoint = "enabled"
+    http_tokens   = "required"
+  }
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+  }
+
   tags = {
     Name = "${var.project_name}-ec2"
+  }
+
+  lifecycle {
+    create_before_destroy = true
   }
 }

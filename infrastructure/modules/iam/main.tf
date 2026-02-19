@@ -281,3 +281,21 @@ resource "aws_iam_role_policy_attachment" "ec2_s3_artifacts_attach" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = aws_iam_policy.ec2_s3_artifacts.arn
 }
+
+########################################################
+# EC2 SSM ACCESS (REQUIRED FOR PROPER AUTOMATION)
+########################################################
+
+resource "aws_iam_role_policy_attachment" "ec2_ssm" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+########################################################
+# EC2 CODEDEPLOY PERMISSION (REQUIRED)
+########################################################
+
+resource "aws_iam_role_policy_attachment" "ec2_codedeploy" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2RoleforAWSCodeDeploy"
+}

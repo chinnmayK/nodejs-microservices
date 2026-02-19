@@ -19,6 +19,10 @@ COPY --from=builder /app /app
 
 USER appuser
 
+# default port for gateway
+ENV PORT=8000
+
 EXPOSE 8000
 
+# runtime entrypoint at project root
 CMD ["node", "index.js"]

@@ -8,33 +8,38 @@ env:
 phases:
   pre_build:
     commands:
-      # Ensure any hidden Windows characters are stripped from all shell scripts and config files
       - echo "Converting Windows line endings to Unix format..."
       - find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
       - find . -type f -name "appspec.yml" -exec sed -i 's/\r$//' {} +
       - find . -type f -name "docker-compose.yml" -exec sed -i 's/\r$//' {} +
 
-      - echo Logging in to Amazon ECR...
+      - echo "Ensuring ECR repositories exist..."
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-customer" || aws ecr create-repository --repository-name "$PROJECT_NAME-customer"
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-products" || aws ecr create-repository --repository-name "$PROJECT_NAME-products"
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-shopping" || aws ecr create-repository --repository-name "$PROJECT_NAME-shopping"
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-gateway" || aws ecr create-repository --repository-name "$PROJECT_NAME-gateway"
+
+      - echo "Logging in to Amazon ECR..."
       - aws --version
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
 
   build:
     commands:
-      - echo Build started on `date`
-      - docker build -t $PROJECT_NAME-customer ./customer
-      - docker build -t $PROJECT_NAME-products ./products
-      - docker build -t $PROJECT_NAME-shopping ./shopping
-      - docker build -t $PROJECT_NAME-gateway ./gateway
+      - echo "Build started on `date`"
+      - docker build -t $PROJECT_NAME-customer:$IMAGE_TAG ./customer
+      - docker build -t $PROJECT_NAME-products:$IMAGE_TAG ./products
+      - docker build -t $PROJECT_NAME-shopping:$IMAGE_TAG ./shopping
+      - docker build -t $PROJECT_NAME-gateway:$IMAGE_TAG ./gateway
 
-      - docker tag $PROJECT_NAME-customer:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-products:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-shopping:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-gateway:latest $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-customer:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-products:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-shopping:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-gateway:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
 
   post_build:
     commands:
-      - echo Pushing images...
+      - echo "Pushing images..."
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
@@ -42,4 +47,6 @@ phases:
 
 artifacts:
   files:
-    - '**/*'
+    - appspec.yml
+    - docker-compose.yml
+    

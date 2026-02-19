@@ -17,6 +17,9 @@ COPY --from=builder /app /app
 
 USER appuser
 
+# default port for shopping service
+ENV PORT=8003
+
 EXPOSE 8003
 
-CMD ["node", "index.js"]
+CMD ["node", "src/index.js"]

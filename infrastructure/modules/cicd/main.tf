@@ -156,7 +156,7 @@ resource "aws_codepipeline" "microservices_pipeline" {
       owner           = "AWS"
       provider        = "CodeDeploy"
       version         = "1"
-      input_artifacts = ["source_output"]
+      input_artifacts = ["build_output"]
 
       configuration = {
         ApplicationName     = aws_codedeploy_app.app.name
@@ -164,4 +164,11 @@ resource "aws_codepipeline" "microservices_pipeline" {
       }
     }
   }
+
+  depends_on = [
+    aws_codestarconnections_connection.github,
+    aws_codebuild_project.microservices_build,
+    aws_codedeploy_app.app
+  ]
+
 }

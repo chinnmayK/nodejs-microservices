@@ -17,6 +17,9 @@ COPY --from=builder /app /app
 
 USER appuser
 
+# default port for products service
+ENV PORT=8002
+
 EXPOSE 8002
 
 CMD ["node", "src/index.js"]

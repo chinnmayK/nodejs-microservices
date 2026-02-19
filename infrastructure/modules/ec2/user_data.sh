@@ -1,51 +1,156 @@
 #!/bin/bash
-set -e
+set -euxo pipefail
 
-# Redirect output to log for debugging
 exec > /var/log/user-data.log 2>&1
 
-echo "Starting EC2 bootstrap..."
+echo "===== Starting EC2 Bootstrap ====="
 
-# 1. Update system and install prerequisites
+export DEBIAN_FRONTEND=noninteractive
+
+########################################
+# Detect Region
+########################################
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+
+########################################
+# Update System
+########################################
 apt-get update -y
-apt-get install -y ca-certificates curl gnupg lsb-release
+apt-get upgrade -y
 
-# 2. Add Docker’s official GPG key
-mkdir -p /etc/apt/keyrings
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+apt-get install -y \
+  ca-certificates \
+  curl \
+  gnupg \
+  lsb-release \
+  unzip \
+  wget \
+  git \
+  ruby-full
+
+########################################
+# Install Docker
+########################################
+
+install -m 0755 -d /etc/apt/keyrings
+
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+  | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
 chmod a+r /etc/apt/keyrings/docker.gpg
 
-# 3. Set up the Docker repository
 echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
-  $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] \
+  https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" \
+  > /etc/apt/sources.list.d/docker.list
 
-# 4. Install Docker Engine and Docker Compose Plugin
 apt-get update -y
-apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin awscli ruby wget git unzip
 
-# 5. Enable & start Docker
+apt-get install -y \
+  docker-ce \
+  docker-ce-cli \
+  containerd.io \
+  docker-buildx-plugin \
+  docker-compose-plugin
+
 systemctl enable docker
 systemctl start docker
 
-# Add ubuntu to docker group so 'docker' commands work without sudo
 usermod -aG docker ubuntu
 
-# 6. Install CloudWatch Agent
+########################################
+# Install AWS CLI v2
+########################################
+
 cd /tmp
-wget https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip -o awscliv2.zip
+./aws/install
+
+########################################
+# Install CloudWatch Agent
+########################################
+
+cd /tmp
+wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
 dpkg -i amazon-cloudwatch-agent.deb
 
-# 7. Install CodeDeploy Agent
+########################################
+# Create CloudWatch Config
+########################################
+
+cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "metrics": {
+    "append_dimensions": {
+      "InstanceId": "\${aws:InstanceId}",
+      "InstanceType": "\${aws:InstanceType}"
+    },
+    "metrics_collected": {
+      "cpu": {
+        "measurement": ["cpu_usage_idle","cpu_usage_user","cpu_usage_system"],
+        "totalcpu": true
+      },
+      "mem": {
+        "measurement": ["mem_used_percent"]
+      },
+      "disk": {
+        "measurement": ["used_percent"],
+        "resources": ["*"]
+      }
+    }
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "/ec2/syslog",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/user-data.log",
+            "log_group_name": "/ec2/user-data",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  }
+}
+EOF
+
+systemctl enable amazon-cloudwatch-agent
+
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+  -a fetch-config \
+  -m ec2 \
+  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+  -s
+
+########################################
+# Install CodeDeploy Agent
+########################################
+
 cd /home/ubuntu
-wget https://aws-codedeploy-ap-south-1.s3.ap-south-1.amazonaws.com/latest/install
-chmod +x ./install
+wget -q https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install
+chmod +x install
 ./install auto
+
 systemctl enable codedeploy-agent
 systemctl start codedeploy-agent
 
-# 8. Create application directory
-mkdir -p /opt/node-app
-chown ubuntu:ubuntu /opt/node-app
+########################################
+# Create Application Directory
+########################################
 
-echo "EC2 bootstrap complete"
+mkdir -p /opt/node-app
+chown -R ubuntu:ubuntu /opt/node-app
+
+echo "===== EC2 Bootstrap Complete ====="
