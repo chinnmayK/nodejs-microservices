@@ -18,7 +18,7 @@ resource "random_password" "jwt_secret" {
 ############################################
 
 resource "aws_secretsmanager_secret" "mongo_secret" {
-  name = "${var.project_name}-mongo-credentials"
+  name = "${var.project_name}-mongo-credentials_v1"
 }
 
 resource "aws_secretsmanager_secret_version" "mongo_secret_value" {
@@ -35,7 +35,7 @@ resource "aws_secretsmanager_secret_version" "mongo_secret_value" {
 ############################################
 
 resource "aws_secretsmanager_secret" "rabbit_secret" {
-  name = "${var.project_name}-rabbitmq-credentials"
+  name = "${var.project_name}-rabbitmq-credentials_v1"
 }
 
 resource "aws_secretsmanager_secret_version" "rabbit_secret_value" {
@@ -52,7 +52,7 @@ resource "aws_secretsmanager_secret_version" "rabbit_secret_value" {
 ############################################
 
 resource "aws_secretsmanager_secret" "jwt_secret" {
-  name = "${var.project_name}-jwt-secret"
+  name = "${var.project_name}-jwt-secret_v1"
 }
 
 resource "aws_secretsmanager_secret_version" "jwt_secret_value" {
@@ -64,7 +64,7 @@ resource "aws_secretsmanager_secret_version" "jwt_secret_value" {
 }
 
 resource "aws_secretsmanager_secret" "redis_secret" {
-  name = "node-microservices-redis"
+  name = "${var.project_name}-redis_v1"
 }
 
 resource "aws_secretsmanager_secret_version" "redis_secret_value" {

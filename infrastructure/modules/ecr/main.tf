@@ -11,6 +11,7 @@ resource "aws_ecr_repository" "repos" {
   for_each = toset(local.services)
 
   name = "${var.project_name}-${each.key}"
+  force_delete = true
 
   image_scanning_configuration {
     scan_on_push = true
