@@ -14,14 +14,14 @@ cd $APP_DIR
 docker compose down || true
 
 echo "Pulling latest images..."
-docker pull $ECR_URL/node-microservices-customer:latest
-docker pull $ECR_URL/node-microservices-products:latest
-docker pull $ECR_URL/node-microservices-shopping:latest
-docker pull $ECR_URL/node-microservices-gateway:latest
+for service in customer products shopping gateway; do
+    docker pull $ECR_URL/node-microservices-$service:latest
+done
 
 echo "Starting containers..."
-# Run docker compose up -d directly
-docker compose up -d
+# Using a variable to handle the flag to ensure no trailing characters interfere
+DETACHED_FLAG="-d"
+docker compose up $DETACHED_FLAG
 
 echo "Cleaning up..."
 docker image prune -f

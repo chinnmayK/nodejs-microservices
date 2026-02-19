@@ -8,6 +8,12 @@ env:
 phases:
   pre_build:
     commands:
+      # Ensure any hidden Windows characters are stripped from all shell scripts and config files
+      - echo "Converting Windows line endings to Unix format..."
+      - find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
+      - find . -type f -name "appspec.yml" -exec sed -i 's/\r$//' {} +
+      - find . -type f -name "docker-compose.yml" -exec sed -i 's/\r$//' {} +
+
       - echo Logging in to Amazon ECR...
       - aws --version
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -16,7 +22,6 @@ phases:
   build:
     commands:
       - echo Build started on `date`
-      - sed -i 's/\r$//' deploy.sh
       - docker build -t $PROJECT_NAME-customer ./customer
       - docker build -t $PROJECT_NAME-products ./products
       - docker build -t $PROJECT_NAME-shopping ./shopping
@@ -34,8 +39,6 @@ phases:
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
-      - echo "Cleaning up Windows line endings from deploy.sh"
-      - sed -i 's/\r$//' deploy.sh
 
 artifacts:
   files:

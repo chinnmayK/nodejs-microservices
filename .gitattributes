@@ -1,0 +1,4 @@
+*.sh text eol=lf
+buildspec.yml text eol=lf
+appspec.yml text eol=lf
+docker-compose.yml text eol=lf
