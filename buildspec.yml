@@ -34,6 +34,8 @@ phases:
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
       - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+      - echo "Cleaning up Windows line endings from deploy.sh"
+      - sed -i 's/\r$//' deploy.sh
 
 artifacts:
   files:
