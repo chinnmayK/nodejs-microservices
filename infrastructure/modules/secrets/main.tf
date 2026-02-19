@@ -63,6 +63,7 @@ resource "aws_secretsmanager_secret_version" "jwt_secret_value" {
   })
 }
 
+
 resource "aws_secretsmanager_secret" "redis_secret" {
   name = "${var.project_name}-redis_v1"
 }
