@@ -4,14 +4,12 @@
 
 resource "random_password" "mongo_password" {
   length           = 20
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}"
+  special          = false
 }
 
 resource "random_password" "rabbit_password" {
   length           = 20
-  special          = true
-  override_special = "!#$%&*()-_=+[]{}"
+  special          = false
 }
 
 resource "random_password" "jwt_secret" {
