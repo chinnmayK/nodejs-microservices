@@ -3,11 +3,15 @@ const { MONGO_URI } = require("../config");
 
 const databaseConnection = async () => {
   try {
-    await mongoose.connect(MONGO_URI);
+    await mongoose.connect(MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
     console.log("✅ DB Connected");
   } catch (err) {
-    console.log("❌ DB Connection Error");
-    console.log(err);
+    console.error("❌ DB Connection Error");
+    console.error(err.message);
     process.exit(1);
   }
 };
