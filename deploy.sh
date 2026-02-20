@@ -2,7 +2,9 @@
 set -euo pipefail
 
 APP_DIR="/opt/node-app"
-AWS_REGION="ap-south-1"
+
+# Detect AWS Region dynamically
+AWS_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
 
 echo "===== Fetching AWS Account ID ====="
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -10,6 +12,14 @@ ECR_URL="${ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
 # IMAGE_TAG can be passed via CodeDeploy env variable; fallback to 'latest'
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+
+echo "===== Verifying Docker service ====="
+sleep 10
+if ! systemctl is-active --quiet docker; then
+    echo "Docker not running. Starting Docker..."
+    systemctl start docker
+    sleep 5
+fi
 
 echo "===== Logging into ECR ====="
 aws ecr get-login-password --region "$AWS_REGION" | \

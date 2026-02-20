@@ -9,5 +9,6 @@ output "instance_name" {
 }
 
 output "redis_endpoint" {
-  value = module.network.redis_endpoint
+  description = "Redis cluster endpoint"
+  value       = module.network.redis_endpoint
 }

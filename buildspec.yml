@@ -8,45 +8,64 @@ env:
 phases:
   pre_build:
     commands:
+      - echo "========== PRE-BUILD START =========="
+
+      # Fix Windows line endings (CRLF → LF)
       - echo "Converting Windows line endings to Unix format..."
       - find . -type f -name "*.sh" -exec sed -i 's/\r$//' {} +
       - find . -type f -name "appspec.yml" -exec sed -i 's/\r$//' {} +
       - find . -type f -name "docker-compose.yml" -exec sed -i 's/\r$//' {} +
 
+      # Ensure ECR repositories exist
       - echo "Ensuring ECR repositories exist..."
-      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-customer" || aws ecr create-repository --repository-name "$PROJECT_NAME-customer"
-      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-products" || aws ecr create-repository --repository-name "$PROJECT_NAME-products"
-      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-shopping" || aws ecr create-repository --repository-name "$PROJECT_NAME-shopping"
-      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-gateway" || aws ecr create-repository --repository-name "$PROJECT_NAME-gateway"
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-customer" --region $AWS_DEFAULT_REGION || aws ecr create-repository --repository-name "$PROJECT_NAME-customer" --region $AWS_DEFAULT_REGION
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-products" --region $AWS_DEFAULT_REGION || aws ecr create-repository --repository-name "$PROJECT_NAME-products" --region $AWS_DEFAULT_REGION
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-shopping" --region $AWS_DEFAULT_REGION || aws ecr create-repository --repository-name "$PROJECT_NAME-shopping" --region $AWS_DEFAULT_REGION
+      - aws ecr describe-repositories --repository-names "$PROJECT_NAME-gateway" --region $AWS_DEFAULT_REGION || aws ecr create-repository --repository-name "$PROJECT_NAME-gateway" --region $AWS_DEFAULT_REGION
 
+      # Login to ECR
       - echo "Logging in to Amazon ECR..."
       - aws --version
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - ECR_URL=$ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $ECR_URL
+
+      - echo "========== PRE-BUILD COMPLETE =========="
 
   build:
     commands:
-      - echo "Build started on `date`"
+      - echo "========== BUILD START =========="
+      - echo "Build started on $(date)"
+
+      # Build Docker images
       - docker build -t $PROJECT_NAME-customer:$IMAGE_TAG ./customer
       - docker build -t $PROJECT_NAME-products:$IMAGE_TAG ./products
       - docker build -t $PROJECT_NAME-shopping:$IMAGE_TAG ./shopping
       - docker build -t $PROJECT_NAME-gateway:$IMAGE_TAG ./gateway
 
-      - docker tag $PROJECT_NAME-customer:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-products:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-shopping:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
-      - docker tag $PROJECT_NAME-gateway:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+      # Tag images for ECR
+      - docker tag $PROJECT_NAME-customer:$IMAGE_TAG $ECR_URL/$PROJECT_NAME-customer:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-products:$IMAGE_TAG $ECR_URL/$PROJECT_NAME-products:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-shopping:$IMAGE_TAG $ECR_URL/$PROJECT_NAME-shopping:$IMAGE_TAG
+      - docker tag $PROJECT_NAME-gateway:$IMAGE_TAG $ECR_URL/$PROJECT_NAME-gateway:$IMAGE_TAG
+
+      - echo "========== BUILD COMPLETE =========="
 
   post_build:
     commands:
-      - echo "Pushing images..."
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-customer:$IMAGE_TAG
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-products:$IMAGE_TAG
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-shopping:$IMAGE_TAG
-      - docker push $ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$PROJECT_NAME-gateway:$IMAGE_TAG
+      - echo "========== PUSH START =========="
+
+      # Push images
+      - docker push $ECR_URL/$PROJECT_NAME-customer:$IMAGE_TAG
+      - docker push $ECR_URL/$PROJECT_NAME-products:$IMAGE_TAG
+      - docker push $ECR_URL/$PROJECT_NAME-shopping:$IMAGE_TAG
+      - docker push $ECR_URL/$PROJECT_NAME-gateway:$IMAGE_TAG
+
+      - echo "========== PUSH COMPLETE =========="
 
 artifacts:
   files:
     - appspec.yml
     - docker-compose.yml
     - deploy.sh
+  discard-paths: yes

@@ -1,3 +1,7 @@
+############################################################
+# SERVICES LIST
+############################################################
+
 locals {
   services = [
     "customer",
@@ -7,22 +11,34 @@ locals {
   ]
 }
 
+############################################################
+# ECR REPOSITORIES
+############################################################
+
 resource "aws_ecr_repository" "repos" {
   for_each = toset(local.services)
 
-  name = "${var.project_name}-${each.key}"
+  name         = "${var.project_name}-${each.key}"
   force_delete = true
+
+  image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {
     scan_on_push = true
   }
 
-  image_tag_mutability = "MUTABLE"
+  encryption_configuration {
+    encryption_type = "AES256"
+  }
 
   tags = {
     Name = "${var.project_name}-${each.key}"
   }
 }
+
+############################################################
+# LIFECYCLE POLICY
+############################################################
 
 resource "aws_ecr_lifecycle_policy" "lifecycle" {
   for_each   = aws_ecr_repository.repos
@@ -30,11 +46,28 @@ resource "aws_ecr_lifecycle_policy" "lifecycle" {
 
   policy = jsonencode({
     rules = [
+
+      # Remove untagged images
       {
         rulePriority = 1
-        description  = "Keep last 10 images"
+        description  = "Expire untagged images"
         selection = {
-          tagStatus     = "any"
+          tagStatus   = "untagged"
+          countType   = "imageCountMoreThan"
+          countNumber = 1
+        }
+        action = {
+          type = "expire"
+        }
+      },
+
+      # Keep last 10 images tagged with anything
+      {
+        rulePriority = 2
+        description  = "Keep last 10 tagged images"
+        selection = {
+          tagStatus     = "tagged"
+          tagPrefixList = ["latest"]
           countType     = "imageCountMoreThan"
           countNumber   = 10
         }

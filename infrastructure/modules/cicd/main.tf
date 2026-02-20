@@ -15,6 +15,17 @@ resource "aws_s3_bucket_versioning" "artifact_versioning" {
   }
 }
 
+# 🔐 Recommended: Enable encryption
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifact_encryption" {
+  bucket = aws_s3_bucket.artifact_bucket.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
 ############################################################
 # CODEBUILD PROJECT
 ############################################################
@@ -69,6 +80,12 @@ resource "aws_codedeploy_deployment_group" "deployment_group" {
 
   deployment_config_name = "CodeDeployDefault.AllAtOnce"
 
+  # Explicit deployment style
+  deployment_style {
+    deployment_type   = "IN_PLACE"
+    deployment_option = "WITHOUT_TRAFFIC_CONTROL"
+  }
+
   ec2_tag_set {
     ec2_tag_filter {
       key   = "Name"
@@ -98,6 +115,12 @@ resource "aws_codepipeline" "microservices_pipeline" {
   artifact_store {
     location = aws_s3_bucket.artifact_bucket.bucket
     type     = "S3"
+
+    # 🔐 Recommended encryption block
+    encryption_key {
+      id   = "alias/aws/s3"
+      type = "KMS"
+    }
   }
 
   ################################
@@ -168,7 +191,7 @@ resource "aws_codepipeline" "microservices_pipeline" {
   depends_on = [
     aws_codestarconnections_connection.github,
     aws_codebuild_project.microservices_build,
-    aws_codedeploy_app.app
+    aws_codedeploy_app.app,
+    aws_s3_bucket_server_side_encryption_configuration.artifact_encryption
   ]
-
 }

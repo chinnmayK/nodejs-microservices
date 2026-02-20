@@ -10,7 +10,7 @@ trap 'echo "ERROR on line $LINENO"; exit 1' ERR
 export DEBIAN_FRONTEND=noninteractive
 
 ########################################
-# Wait for apt to be ready
+# Wait for apt lock
 ########################################
 echo "Waiting for apt lock..."
 while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
@@ -18,19 +18,16 @@ while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
 done
 
 ########################################
-# Detect Region (IMDSv2 compatible)
+# Detect Region
 ########################################
-TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
-  -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
-
-REGION=$(curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
-  http://169.254.169.254/latest/meta-data/placement/region)
-
+REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $4}')
 echo "Detected region: $REGION"
 
 ########################################
 # Update System
 ########################################
+apt-get clean
+rm -rf /var/lib/apt/lists/*
 apt-get update -y
 apt-get upgrade -y
 
@@ -48,7 +45,6 @@ apt-get install -y \
 ########################################
 # Install Docker
 ########################################
-
 install -m 0755 -d /etc/apt/keyrings
 
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
@@ -75,6 +71,13 @@ apt-get install -y \
 
 systemctl enable docker
 systemctl start docker
+sleep 15
+
+# Ensure Docker is active
+if ! systemctl is-active --quiet docker; then
+  echo "Docker failed to start"
+  exit 1
+fi
 
 usermod -aG docker ubuntu
 
@@ -155,12 +158,15 @@ systemctl enable amazon-cloudwatch-agent
 ########################################
 cd /home/ubuntu
 
-wget -q https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install
+wget -q https://aws-codedeploy-${REGION}.s3.${REGION}.amazonaws.com/latest/install || \
+wget -q https://aws-codedeploy-${REGION}.s3.amazonaws.com/latest/install
+
 chmod +x install
 ./install auto
 
 systemctl enable codedeploy-agent
 systemctl start codedeploy-agent
+sleep 5
 
 ########################################
 # Create Application Directory

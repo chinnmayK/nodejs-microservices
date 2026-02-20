@@ -10,6 +10,6 @@ variable "security_group_id" {
   type = string
 }
 
-variable "instance_role_name" {
+variable "instance_profile_name" {
   type = string
 }

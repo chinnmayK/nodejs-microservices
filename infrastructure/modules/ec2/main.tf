@@ -4,10 +4,10 @@ resource "aws_instance" "app" {
   subnet_id                   = var.subnet_id
   vpc_security_group_ids      = [var.security_group_id]
   associate_public_ip_address = true
-  iam_instance_profile        = var.instance_role_name
+  iam_instance_profile        = var.instance_profile_name
   key_name                    = "my-key"
 
-  user_data = file("${path.module}/user_data.sh")
+  user_data_base64 = base64encode(file("${path.module}/user_data.sh"))
 
   metadata_options {
     http_endpoint = "enabled"

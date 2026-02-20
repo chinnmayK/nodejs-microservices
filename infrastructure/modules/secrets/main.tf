@@ -1,11 +1,17 @@
+############################################################
+# RANDOM PASSWORDS
+############################################################
+
 resource "random_password" "mongo_password" {
-  length  = 20
-  special = true
+  length           = 20
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}"
 }
 
 resource "random_password" "rabbit_password" {
-  length  = 20
-  special = true
+  length           = 20
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}"
 }
 
 resource "random_password" "jwt_secret" {
@@ -13,12 +19,13 @@ resource "random_password" "jwt_secret" {
   special = false
 }
 
-############################################
+############################################################
 # MongoDB Secret
-############################################
+############################################################
 
 resource "aws_secretsmanager_secret" "mongo_secret" {
-  name = "${var.project_name}-mongo-credentials_v1"
+  name                    = "${var.project_name}-mongo-credentials_v2"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "mongo_secret_value" {
@@ -30,12 +37,13 @@ resource "aws_secretsmanager_secret_version" "mongo_secret_value" {
   })
 }
 
-############################################
+############################################################
 # RabbitMQ Secret
-############################################
+############################################################
 
 resource "aws_secretsmanager_secret" "rabbit_secret" {
-  name = "${var.project_name}-rabbitmq-credentials_v1"
+  name                    = "${var.project_name}-rabbitmq-credentials_v2"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "rabbit_secret_value" {
@@ -47,12 +55,13 @@ resource "aws_secretsmanager_secret_version" "rabbit_secret_value" {
   })
 }
 
-############################################
+############################################################
 # JWT Secret
-############################################
+############################################################
 
 resource "aws_secretsmanager_secret" "jwt_secret" {
-  name = "${var.project_name}-jwt-secret_v1"
+  name                    = "${var.project_name}-jwt-secret_v2"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "jwt_secret_value" {
@@ -63,9 +72,13 @@ resource "aws_secretsmanager_secret_version" "jwt_secret_value" {
   })
 }
 
+############################################################
+# Redis Secret
+############################################################
 
 resource "aws_secretsmanager_secret" "redis_secret" {
-  name = "${var.project_name}-redis_v1"
+  name                    = "${var.project_name}-redis_v2"
+  recovery_window_in_days = 0
 }
 
 resource "aws_secretsmanager_secret_version" "redis_secret_value" {
@@ -75,4 +88,3 @@ resource "aws_secretsmanager_secret_version" "redis_secret_value" {
     REDIS_URL = var.redis_endpoint
   })
 }
-
