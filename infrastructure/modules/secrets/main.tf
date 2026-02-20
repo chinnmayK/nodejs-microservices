@@ -86,3 +86,16 @@ resource "aws_secretsmanager_secret_version" "redis_secret_value" {
     REDIS_URL = var.redis_endpoint
   })
 }
+
+resource "aws_secretsmanager_secret" "ngrok_secret" {
+  name                    = "${var.project_name}-ngrok-token"
+  recovery_window_in_days = 0
+}
+
+resource "aws_secretsmanager_secret_version" "ngrok_secret_value" {
+  secret_id = aws_secretsmanager_secret.ngrok_secret.id
+
+  secret_string = jsonencode({
+    token = "36hO44WBmbBQi4gzS1uKG3rcd0M_5s1VJ5EFGc6vQw7A12h5y"
+  })
+}

@@ -35,6 +35,7 @@ if [ -z "$REGION" ]; then
 fi
 
 echo "Detected region: $REGION"
+export AWS_REGION="$REGION"
 
 ########################################
 # Update System
@@ -86,7 +87,6 @@ systemctl enable docker
 systemctl start docker
 sleep 15
 
-# Ensure Docker is active
 if ! systemctl is-active --quiet docker; then
   echo "Docker failed to start"
   exit 1
@@ -101,6 +101,63 @@ cd /tmp
 curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
 unzip -o awscliv2.zip
 ./aws/install
+
+########################################
+# Install jq (required for secrets parsing)
+########################################
+apt-get install -y jq
+
+########################################
+# Install ngrok (HARDENED VERSION)
+########################################
+cd /tmp
+wget -q https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
+tar -xzf ngrok-v3-stable-linux-amd64.tgz
+mv ngrok /usr/local/bin/
+chmod +x /usr/local/bin/ngrok
+
+########################################
+# Fetch ngrok token from Secrets Manager
+########################################
+NGROK_TOKEN=$(aws secretsmanager get-secret-value \
+  --secret-id node-microservices-ngrok-token \
+  --region "$AWS_REGION" \
+  --query SecretString \
+  --output text)
+
+if [ -z "$NGROK_TOKEN" ]; then
+  echo "ERROR: NGROK token not found"
+  exit 1
+fi
+
+mkdir -p /root/.config/ngrok
+
+ngrok config add-authtoken "$NGROK_TOKEN" \
+  --config /root/.config/ngrok/ngrok.yml
+
+########################################
+# Create systemd service
+########################################
+cat <<EOF > /etc/systemd/system/ngrok.service
+[Unit]
+Description=ngrok tunnel
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/ngrok http 8000 --config /root/.config/ngrok/ngrok.yml
+Restart=always
+RestartSec=5
+User=root
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
+systemctl enable ngrok
+systemctl start ngrok
 
 ########################################
 # Install CloudWatch Agent
