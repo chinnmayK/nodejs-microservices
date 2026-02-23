@@ -103,12 +103,7 @@ unzip -o awscliv2.zip
 ./aws/install
 
 ########################################
-# Install jq (required for secrets parsing)
-########################################
-apt-get install -y jq
-
-########################################
-# Install ngrok (HARDENED VERSION)
+# Install ngrok
 ########################################
 cd /tmp
 wget -q https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-amd64.tgz
@@ -117,7 +112,7 @@ mv ngrok /usr/local/bin/
 chmod +x /usr/local/bin/ngrok
 
 ########################################
-# Fetch ngrok token from Secrets Manager
+# Fetch ngrok token
 ########################################
 NGROK_TOKEN=$(aws secretsmanager get-secret-value \
   --secret-id node-microservices-ngrok-token \
@@ -136,7 +131,7 @@ ngrok config add-authtoken "$NGROK_TOKEN" \
   --config /root/.config/ngrok/ngrok.yml
 
 ########################################
-# Create systemd service
+# Create systemd service (DO NOT START HERE)
 ########################################
 cat <<EOF > /etc/systemd/system/ngrok.service
 [Unit]
@@ -155,69 +150,8 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-########################################
-# Install CloudWatch Agent
-########################################
-cd /tmp
-wget -q https://s3.amazonaws.com/amazoncloudwatch-agent/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
-dpkg -i amazon-cloudwatch-agent.deb
-
-########################################
-# Configure CloudWatch Agent
-########################################
-cat <<EOF > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
-{
-  "agent": {
-    "metrics_collection_interval": 60,
-    "run_as_user": "root"
-  },
-  "metrics": {
-    "append_dimensions": {
-      "InstanceId": "\${aws:InstanceId}",
-      "InstanceType": "\${aws:InstanceType}"
-    },
-    "metrics_collected": {
-      "cpu": {
-        "measurement": ["cpu_usage_idle","cpu_usage_user","cpu_usage_system"],
-        "totalcpu": true
-      },
-      "mem": {
-        "measurement": ["mem_used_percent"]
-      },
-      "disk": {
-        "measurement": ["used_percent"],
-        "resources": ["*"]
-      }
-    }
-  },
-  "logs": {
-    "logs_collected": {
-      "files": {
-        "collect_list": [
-          {
-            "file_path": "/var/log/syslog",
-            "log_group_name": "/ec2/syslog",
-            "log_stream_name": "{instance_id}"
-          },
-          {
-            "file_path": "/var/log/user-data.log",
-            "log_group_name": "/ec2/user-data",
-            "log_stream_name": "{instance_id}"
-          }
-        ]
-      }
-    }
-  }
-}
-EOF
-
-systemctl enable amazon-cloudwatch-agent
-
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
-  -a fetch-config \
-  -m ec2 \
-  -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
-  -s
+systemctl daemon-reload
+systemctl enable ngrok
 
 ########################################
 # Install CodeDeploy Agent
