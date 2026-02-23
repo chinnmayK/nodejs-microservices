@@ -160,6 +160,25 @@ echo "Starting containers..."
 $DOCKER_CMD up -d
 
 ########################################
+# Wait for Gateway to be ready
+########################################
+echo "Waiting for gateway on port 8000..."
+
+for i in {1..30}; do
+  if curl -s http://localhost:8000 >/dev/null 2>&1; then
+    echo "Gateway is ready."
+    break
+  fi
+  sleep 3
+done
+
+########################################
+# Restart ngrok service
+########################################
+echo "Starting ngrok tunnel..."
+systemctl restart ngrok
+
+########################################
 # Cleanup
 ########################################
 docker image prune -f --filter "dangling=true"

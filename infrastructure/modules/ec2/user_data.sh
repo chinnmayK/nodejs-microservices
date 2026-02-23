@@ -155,10 +155,6 @@ User=root
 WantedBy=multi-user.target
 EOF
 
-systemctl daemon-reload
-systemctl enable ngrok
-systemctl start ngrok
-
 ########################################
 # Install CloudWatch Agent
 ########################################
